@@ -32,6 +32,11 @@ def main() -> None:
     validate_dataset(data, 8760)
     featured = build_features(data)
     model, metadata = load_model_artifacts(config["paths"]["model_dir"])
+    if metadata.get("tuned") is not True:
+        raise AssertionError("Final Random Forest artifact was not tuned with TimeSeriesSplit.")
+    scaler = metadata.get("preprocessing", {}).get("continuous_feature_scaling", "")
+    if "MinMaxScaler" not in scaler:
+        raise AssertionError("Final model metadata does not confirm MinMax normalization.")
     prediction = model.predict(featured[DEFAULT_FEATURES].tail(48))
     if not np.isfinite(prediction).all() or (prediction < 0).any():
         raise AssertionError("Model produced invalid predictions.")
