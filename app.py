@@ -18,8 +18,14 @@ st.set_page_config(page_title="AI Microgrid Load Forecasting", page_icon="⚡", 
 st.markdown(
     """
     <style>
+    :root {color-scheme: light;}
+    .stApp, [data-testid="stAppViewContainer"] {background-color: #FFFFFF; color: #172B3A;}
     .block-container {padding-top: 1.5rem; padding-bottom: 2rem;}
     [data-testid="stMetric"] {background: #f1f7f8; border: 1px solid #d2e4e7; padding: 12px; border-radius: 10px;}
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"], [data-testid="stMetricDelta"] {color: #123B5D !important; opacity: 1 !important;}
+    button[data-baseweb="tab"] p, button[data-baseweb="tab"] div {color: #123B5D !important; opacity: 1 !important;}
+    [data-testid="stSidebar"] {background-color: #F1F7F8;}
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {color: #172B3A !important;}
     h1, h2, h3 {color: #123B5D;}
     </style>
     """,
@@ -57,12 +63,13 @@ importance = pd.read_csv(config["paths"]["output_dir"] / "feature_importance.csv
 summary = dataset_summary(data)
 
 st.title("⚡ AI-Based Load Forecasting for Microgrids")
-st.caption("Random Forest short-term forecasting | Godishala 33/11 kV Substation, Telangana, India")
+st.caption("Random Forest short-term forecasting | Software-only microgrid-scale case study using Godishala 33/11 kV Substation data")
 
 with st.sidebar:
     st.header("Project controls")
     display_days = st.slider("Chart window (days)", 2, 60, 14)
     st.info("Dataset: 8,760 hourly records covering all of 2021. Target: active power load (kW).")
+    st.caption("For one-hour records, average kW × 1 hour gives hourly energy in kWh.")
     st.markdown("**Core model:** Random Forest Regressor")
     st.markdown("**Validation:** chronological 80/20 split")
 
@@ -86,7 +93,8 @@ with tab_overview:
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("System workflow")
-    st.markdown("**Hourly data → validation and cleaning → time/lag features → chronological split → Random Forest and baselines → dashboard, CSV and PDF reports**")
+    st.markdown("**Hourly data → forward-fill and IQR cleaning → time/lag features → chronological split → MinMax normalization → tuned Random Forest and baselines → dashboard, CSV and PDF reports**")
+    st.success(f"Preprocessing verified: no missing values; {summary.get('iqr_outliers_replaced', 0)} IQR load outlier(s) replaced without breaking the hourly timeline.")
 
 with tab_data:
     st.subheader("Historical demand and weather")
@@ -170,9 +178,11 @@ with tab_about:
         """
         - **Objective:** predict short-term active power demand for localized energy management.
         - **Inputs:** historical load, temperature, humidity, calendar cycles, 1/24/168-hour lags, and shifted rolling statistics.
-        - **Core model:** Random Forest Regressor; compared with Linear Regression and a 24-hour seasonal-naive baseline.
+        - **Preprocessing:** forward-fill missing values, IQR outlier detection/replacement, and training-only MinMax normalization.
+        - **Core model:** TimeSeriesSplit-tuned Random Forest Regressor; compared with Linear Regression, ARIMA, and a 24-hour seasonal-naive baseline.
         - **Validation:** the last 20% of records are held out chronologically; no random shuffling is used.
         - **Leakage prevention:** voltage, current, and power factor are excluded because they directly calculate active power.
+        - **Scope:** the substation dataset is used as a software-only microgrid-scale forecasting case study; the modular pipeline can be retrained on residential/campus smart-meter data.
         - **Limitations:** this is decision-support software, not an automatic grid controller. Forecast quality depends on data and future weather quality.
         """
     )
