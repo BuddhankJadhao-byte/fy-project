@@ -8,7 +8,11 @@ import pandas as pd
 REQUIRED_COLUMNS = ("timestamp", "load_kw", "temperature_c", "humidity_pct")
 
 
-def prepare_godishala_dataset(source_path: str | Path, output_path: str | Path) -> pd.DataFrame:
+def prepare_godishala_dataset(
+    source_path: str | Path,
+    output_path: str | Path,
+    iqr_factor: float = 3.0,
+) -> pd.DataFrame:
     """Convert the published Godishala workbook into a clean forecasting CSV.
 
     The workbook contains one row per hour and 8,760 rows. Its DATE cells are
@@ -43,11 +47,12 @@ def prepare_godishala_dataset(source_path: str | Path, output_path: str | Path) 
         }
     )
     numeric = clean.columns.drop("timestamp")
-    clean[numeric] = clean[numeric].interpolate(limit_direction="both")
+    clean[numeric] = forward_fill_missing(clean[numeric])
     # Six published humidity readings are 101-102%; cap them at the physical limit.
     clean["humidity_pct"] = clean["humidity_pct"].clip(0, 100)
     clean["temperature_c"] = clean["temperature_c"].round(3)
     clean["load_kw"] = clean["load_kw"].round(3)
+    clean = iqr_replace_outliers(clean, factor=iqr_factor)
 
     validate_dataset(clean, minimum_hours=8760)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,14 +108,37 @@ def dataset_summary(frame: pd.DataFrame) -> dict[str, object]:
         "temperature_mean_c": float(frame["temperature_c"].mean()),
         "humidity_mean_pct": float(frame["humidity_pct"].mean()),
         "shutdown_hours": int(frame.get("substation_shutdown", pd.Series(dtype=int)).sum()),
+        "iqr_outliers_replaced": int(frame.get("load_outlier_flag", pd.Series(dtype=int)).sum()),
     }
 
 
-def iqr_clip(frame: pd.DataFrame, column: str = "load_kw", factor: float = 3.0) -> pd.DataFrame:
-    """Winsorize extreme sensor errors while retaining legitimate demand peaks."""
+def forward_fill_missing(frame: pd.DataFrame) -> pd.DataFrame:
+    """Apply the synopsis-specified forward fill, with a safe leading-value fallback."""
+    return frame.ffill().bfill()
+
+
+def iqr_replace_outliers(
+    frame: pd.DataFrame,
+    column: str = "load_kw",
+    factor: float = 3.0,
+) -> pd.DataFrame:
+    """Detect IQR outliers and replace them without breaking the hourly timeline.
+
+    Dropping complete rows would create missing timestamps and invalidate lag features.
+    Values outside the IQR bounds are therefore removed from the signal, marked, and
+    forward-filled as required by the submitted synopsis.
+    """
     result = frame.copy()
     q1, q3 = result[column].quantile([0.25, 0.75])
     iqr = q3 - q1
     lower, upper = max(0.0, q1 - factor * iqr), q3 + factor * iqr
-    result[column] = np.clip(result[column], lower, upper)
+    mask = ~result[column].between(lower, upper)
+    result["load_outlier_flag"] = mask.astype(int)
+    result.loc[mask, column] = np.nan
+    result[column] = forward_fill_missing(result[[column]])[column]
     return result
+
+
+def iqr_clip(frame: pd.DataFrame, column: str = "load_kw", factor: float = 3.0) -> pd.DataFrame:
+    """Backward-compatible alias for the synopsis-aligned IQR replacement step."""
+    return iqr_replace_outliers(frame, column=column, factor=factor)
