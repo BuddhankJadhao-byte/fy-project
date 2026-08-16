@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+from io import BytesIO
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -183,7 +185,15 @@ def train_and_evaluate(
 
 def load_model_artifacts(model_dir: str | Path) -> tuple[Any, dict[str, Any]]:
     model_dir = Path(model_dir)
-    model = joblib.load(model_dir / "random_forest.joblib")
+    model_parts = sorted((model_dir / "random_forest.joblib.parts").glob("part-*.b64"))
+    if model_parts:
+        # GitHub/Streamlit deployments store the binary as small Base64 text
+        # chunks. Joining in memory avoids a write to the read-only app source.
+        encoded = "".join(part.read_text(encoding="ascii") for part in model_parts)
+        model_bytes = base64.b64decode(encoded, validate=True)
+        model = joblib.load(BytesIO(model_bytes))
+    else:
+        model = joblib.load(model_dir / "random_forest.joblib")
     with (model_dir / "metadata.json").open("r", encoding="utf-8") as handle:
         metadata = json.load(handle)
     return model, metadata
