@@ -4,7 +4,7 @@ A complete B.Tech final-year software project for short-term electrical load for
 
 ## Project outcome
 
-The application trains a leakage-safe Random Forest model on one complete year (8,760 hourly samples) of active power load, temperature, humidity, and calendar data. It compares Random Forest against Linear Regression, a conditional-least-squares ARIMA(2,1,0), and a 24-hour seasonal-naive baseline. It then produces evaluation metrics, plots, a 24-hour operational forecast, reusable model files, CSV reports, and a Streamlit web interface.
+The application trains a leakage-safe, TimeSeriesSplit-tuned Random Forest model on one complete year (8,760 hourly samples) of active power load, temperature, humidity, and calendar data. Missing values are forward-filled, IQR outliers are removed from the signal and replaced without breaking the hourly timeline, and a training-only MinMaxScaler is saved with each supervised model. It compares Random Forest against Linear Regression, a conditional-least-squares ARIMA(2,1,0), and a 24-hour seasonal-naive baseline. It then produces evaluation metrics, plots, a 24-hour operational forecast, reusable model files, CSV reports, and a Streamlit web interface.
 
 ## Dataset
 
@@ -66,11 +66,11 @@ If Python 3.11 is not available, Python 3.10 or 3.12 can be used.
 ## Main commands
 
 ```powershell
-# Complete reproducible run
+# Complete reproducible run (includes TimeSeriesSplit tuning)
 python scripts\run_pipeline.py
 
-# Optional Random Forest hyperparameter search with TimeSeriesSplit
-python scripts\run_pipeline.py --tune
+# Quick development run without tuning
+python scripts\run_pipeline.py --no-tune
 
 # Separate stages
 python scripts\prepare_data.py
@@ -105,10 +105,10 @@ Any future custom dataset should contain continuous hourly timestamps and at min
 
 1. Validate a continuous, monotonic hourly sequence.
 2. Convert Fahrenheit to Celsius and retain meaningful numerical columns.
-3. Apply conservative IQR winsorization only to impossible/extreme sensor spikes.
+3. Forward-fill missing numerical values and detect IQR outliers; remove flagged values from the signal and forward-fill them without deleting timestamps.
 4. Engineer cyclical hour/day/month variables; 1, 24, and 168-hour lags; and shifted rolling statistics.
 5. Use an 80/20 chronological train/test split without random shuffling.
-6. Train Random Forest and Linear Regression; evaluate ARIMA and seasonal-naive baselines.
+6. Fit MinMaxScaler on training data only, tune Random Forest using TimeSeriesSplit, and compare it with Linear Regression, ARIMA, and seasonal-naive baselines.
 7. Report MAE, RMSE, MAPE, and R².
 8. Generate recursive 1-168 hour forecasts using supplied future weather or a clearly labelled repeated-weather scenario.
 
@@ -116,7 +116,9 @@ Any future custom dataset should contain continuous hourly timestamps and at min
 
 - Lag and rolling features are shifted, so the target hour never enters its own predictors.
 - The final 20% is never used to fit the model.
-- Scaling is not required for Random Forest; Linear Regression uses the same engineered features for a fair input comparison.
+- MinMax scaling is retained in the saved pipelines to match the approved synopsis and is fitted only on training data to prevent leakage.
+- Hourly average load is modelled in kW. Multiplying by the one-hour interval gives the corresponding hourly energy in kWh.
+- The Indian substation dataset is treated as a software-only microgrid-scale case study; the modular pipeline can be retrained on compatible residential/campus smart-meter data.
 - Forecasts support energy-management decisions but do not directly control electrical equipment.
 
 ## Deliverables generated
