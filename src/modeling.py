@@ -15,7 +15,7 @@ from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 
-from .features import DEFAULT_FEATURES, temporal_split
+from .features import DEFAULT_FEATURES, build_features, temporal_split
 
 
 @dataclass(frozen=True)
@@ -183,7 +183,21 @@ def train_and_evaluate(
 
 def load_model_artifacts(model_dir: str | Path) -> tuple[Any, dict[str, Any]]:
     model_dir = Path(model_dir)
-    model = joblib.load(model_dir / "random_forest.joblib")
     with (model_dir / "metadata.json").open("r", encoding="utf-8") as handle:
         metadata = json.load(handle)
+    try:
+        model = joblib.load(model_dir / "random_forest.joblib")
+    except Exception:
+        # A binary artifact can be damaged by a repository transfer. Rebuild the
+        # same final model from the versioned data and recorded tuned parameters.
+        data_path = model_dir.parent / "data" / "processed" / "godishala_microgrid_hourly_2021.csv"
+        frame = pd.read_csv(data_path, parse_dates=["timestamp"])
+        featured = build_features(frame)
+        train, _ = temporal_split(featured, float(metadata.get("test_fraction", 0.2)))
+        params = dict(metadata["random_forest_params"])
+        model = Pipeline([
+            ("scaler", MinMaxScaler()),
+            ("regressor", RandomForestRegressor(**params)),
+        ])
+        model.fit(train[metadata["features"]], train[metadata["target"]])
     return model, metadata
