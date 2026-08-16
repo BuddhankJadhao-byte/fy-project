@@ -62,9 +62,9 @@ def tune_random_forest(X: pd.DataFrame, y: pd.Series, random_state: int = 42) ->
     search = RandomizedSearchCV(
         base,
         param_distributions={
-            "regressor__n_estimators": [100, 160, 240],
-            "regressor__max_depth": [12, 18, None],
-            "regressor__min_samples_leaf": [1, 2, 4],
+            "regressor__n_estimators": [40, 60, 80],
+            "regressor__max_depth": [8, 10, 12],
+            "regressor__min_samples_leaf": [2, 4, 6],
             "regressor__max_features": [0.6, 0.8, 1.0],
         },
         n_iter=10,
@@ -149,8 +149,8 @@ def train_and_evaluate(
     }).sort_values(
         "importance", ascending=False
     )
-    joblib.dump(rf, model_dir / "random_forest.joblib")
-    joblib.dump(linear, model_dir / "linear_regression.joblib")
+    joblib.dump(rf, model_dir / "random_forest.joblib", compress=9)
+    joblib.dump(linear, model_dir / "linear_regression.joblib", compress=9)
     predictions.to_csv(output_dir / "test_predictions.csv", index=False)
     metrics.to_csv(output_dir / "model_metrics.csv", index=False)
     importance.to_csv(output_dir / "feature_importance.csv", index=False)
