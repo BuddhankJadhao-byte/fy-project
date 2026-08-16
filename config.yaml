@@ -1,0 +1,24 @@
+project:
+  name: AI-Based Load Forecasting for Microgrids
+  location: Godishala 33/11 kV Substation, Telangana, India
+  timezone: Asia/Kolkata
+  random_state: 42
+
+paths:
+  raw_data: data/raw/godishala_substation_2021.xlsx
+  processed_data: data/processed/godishala_microgrid_hourly_2021.csv
+  model_dir: models
+  output_dir: outputs
+  figure_dir: outputs/figures
+  forecast_dir: outputs/forecasts
+  report_dir: outputs/reports
+
+training:
+  test_fraction: 0.20
+  iqr_factor: 3.0
+  include_arima: true
+  random_forest:
+    n_estimators: 160
+    max_depth: 18
+    min_samples_leaf: 1
+    max_features: 0.8
