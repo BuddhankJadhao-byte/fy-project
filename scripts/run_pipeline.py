@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.config import ensure_output_directories, load_config
-from src.data import dataset_summary, iqr_clip, load_dataset, prepare_godishala_dataset
+from src.data import dataset_summary, load_dataset, prepare_godishala_dataset
 from src.features import build_features
 from src.forecasting import forecast_future
 from src.modeling import load_model_artifacts, train_and_evaluate
@@ -57,17 +57,21 @@ def create_figures(config: dict, data: pd.DataFrame) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the complete reproducible project pipeline.")
-    parser.add_argument("--tune", action="store_true", help="Run optional time-series RF tuning.")
+    parser.add_argument("--no-tune", action="store_true", help="Skip time-series RF tuning for a quick development run.")
     args = parser.parse_args()
     config = load_config()
     ensure_output_directories(config)
 
-    data = prepare_godishala_dataset(config["paths"]["raw_data"], config["paths"]["processed_data"])
-    featured = build_features(iqr_clip(data, factor=config["training"]["iqr_factor"]))
+    data = prepare_godishala_dataset(
+        config["paths"]["raw_data"],
+        config["paths"]["processed_data"],
+        iqr_factor=config["training"]["iqr_factor"],
+    )
+    featured = build_features(data)
     metrics, metadata = train_and_evaluate(
         featured, config["paths"]["model_dir"], config["paths"]["output_dir"],
         config["training"]["random_forest"], config["training"]["test_fraction"],
-        args.tune, config["project"]["random_state"],
+        not args.no_tune, config["project"]["random_state"],
         config["training"].get("include_arima", False),
     )
     model, _ = load_model_artifacts(config["paths"]["model_dir"])
