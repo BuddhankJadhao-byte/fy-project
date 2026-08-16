@@ -12,6 +12,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
 
 from .features import DEFAULT_FEATURES, temporal_split
 
@@ -37,8 +39,8 @@ def regression_metrics(actual: pd.Series | np.ndarray, predicted: pd.Series | np
     )
 
 
-def build_random_forest(params: dict[str, Any], random_state: int = 42) -> RandomForestRegressor:
-    return RandomForestRegressor(
+def build_random_forest(params: dict[str, Any], random_state: int = 42) -> Pipeline:
+    estimator = RandomForestRegressor(
         n_estimators=int(params.get("n_estimators", 160)),
         max_depth=params.get("max_depth", 18),
         min_samples_leaf=int(params.get("min_samples_leaf", 1)),
@@ -46,17 +48,24 @@ def build_random_forest(params: dict[str, Any], random_state: int = 42) -> Rando
         n_jobs=-1,
         random_state=random_state,
     )
+    return Pipeline([
+        ("scaler", MinMaxScaler()),
+        ("regressor", estimator),
+    ])
 
 
-def tune_random_forest(X: pd.DataFrame, y: pd.Series, random_state: int = 42) -> RandomForestRegressor:
-    base = RandomForestRegressor(n_jobs=-1, random_state=random_state)
+def tune_random_forest(X: pd.DataFrame, y: pd.Series, random_state: int = 42) -> Pipeline:
+    base = Pipeline([
+        ("scaler", MinMaxScaler()),
+        ("regressor", RandomForestRegressor(n_jobs=-1, random_state=random_state)),
+    ])
     search = RandomizedSearchCV(
         base,
         param_distributions={
-            "n_estimators": [100, 160, 240],
-            "max_depth": [12, 18, None],
-            "min_samples_leaf": [1, 2, 4],
-            "max_features": [0.6, 0.8, 1.0],
+            "regressor__n_estimators": [40, 60, 80],
+            "regressor__max_depth": [8, 10, 12],
+            "regressor__min_samples_leaf": [2, 4, 6],
+            "regressor__max_features": [0.6, 0.8, 1.0],
         },
         n_iter=10,
         cv=TimeSeriesSplit(n_splits=4),
@@ -109,7 +118,10 @@ def train_and_evaluate(
 
     rf = tune_random_forest(X_train, y_train, random_state) if tune else build_random_forest(model_params, random_state)
     rf.fit(X_train, y_train)
-    linear = LinearRegression().fit(X_train, y_train)
+    linear = Pipeline([
+        ("scaler", MinMaxScaler()),
+        ("regressor", LinearRegression()),
+    ]).fit(X_train, y_train)
 
     predictions = pd.DataFrame({"timestamp": test["timestamp"], "actual_kw": y_test})
     predictions["random_forest_kw"] = rf.predict(X_test)
@@ -131,11 +143,14 @@ def train_and_evaluate(
         metric_rows.append({"model": name, **asdict(regression_metrics(y_test, predictions[column]))})
     metrics = pd.DataFrame(metric_rows).sort_values("mae_kw").reset_index(drop=True)
 
-    importance = pd.DataFrame({"feature": features, "importance": rf.feature_importances_}).sort_values(
+    importance = pd.DataFrame({
+        "feature": features,
+        "importance": rf.named_steps["regressor"].feature_importances_,
+    }).sort_values(
         "importance", ascending=False
     )
-    joblib.dump(rf, model_dir / "random_forest.joblib")
-    joblib.dump(linear, model_dir / "linear_regression.joblib")
+    joblib.dump(rf, model_dir / "random_forest.joblib", compress=9)
+    joblib.dump(linear, model_dir / "linear_regression.joblib", compress=9)
     predictions.to_csv(output_dir / "test_predictions.csv", index=False)
     metrics.to_csv(output_dir / "model_metrics.csv", index=False)
     importance.to_csv(output_dir / "feature_importance.csv", index=False)
@@ -153,7 +168,12 @@ def train_and_evaluate(
         "random_state": random_state,
         "tuned": tune,
         "include_arima": include_arima,
-        "random_forest_params": rf.get_params(),
+        "preprocessing": {
+            "missing_values": "forward-fill (back-fill only for a leading gap)",
+            "outliers": "IQR detection followed by removal from signal and forward-fill replacement",
+            "continuous_feature_scaling": "MinMaxScaler fitted on training data only",
+        },
+        "random_forest_params": rf.named_steps["regressor"].get_params(),
         "best_model_by_mae": metrics.iloc[0]["model"],
     }
     with (model_dir / "metadata.json").open("w", encoding="utf-8") as handle:

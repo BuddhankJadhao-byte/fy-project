@@ -92,7 +92,7 @@ def build_forecast_report(
     story.extend([
         Paragraph("Methodology Note", heading),
         Paragraph(
-            "Evaluation uses a chronological holdout set. Lag and rolling statistics use only past load values. Voltage, current, and power factor were excluded because they directly determine active power and would leak the prediction target.",
+            "Missing values are forward-filled, IQR outliers are removed from the signal and replaced without deleting hourly timestamps, and MinMaxScaler is fitted only on training data. Random Forest tuning uses TimeSeriesSplit before evaluation on a chronological holdout set. Lag and rolling statistics use only past load values. Voltage, current, and power factor were excluded because they directly determine active power and would leak the prediction target.",
             styles["BodyText"],
         ),
     ])

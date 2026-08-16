@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 
-from src.data import validate_dataset
+from src.data import forward_fill_missing, iqr_replace_outliers, validate_dataset
 from src.features import DEFAULT_FEATURES, build_features, temporal_split
 from src.forecasting import forecast_future
-from src.modeling import regression_metrics
+from src.modeling import build_random_forest, regression_metrics
 from src.reporting import build_forecast_report
 
 
@@ -28,6 +28,21 @@ def sample_data(hours: int = 24 * 40) -> pd.DataFrame:
 
 
 class PipelineTests(unittest.TestCase):
+    def test_synopsis_preprocessing(self) -> None:
+        values = pd.DataFrame({"load_kw": [100.0, np.nan, 102.0]})
+        filled = forward_fill_missing(values)
+        self.assertEqual(filled.loc[1, "load_kw"], 100.0)
+        data = sample_data()
+        data.loc[500, "load_kw"] = 1_000_000.0
+        cleaned = iqr_replace_outliers(data, factor=1.5)
+        self.assertEqual(cleaned.loc[500, "load_outlier_flag"], 1)
+        self.assertLess(cleaned.loc[500, "load_kw"], 1_000_000.0)
+
+    def test_random_forest_pipeline_uses_minmax_scaling(self) -> None:
+        model = build_random_forest({"n_estimators": 10, "max_depth": 4}, random_state=1)
+        self.assertEqual(list(model.named_steps), ["scaler", "regressor"])
+        self.assertEqual(model.named_steps["scaler"].__class__.__name__, "MinMaxScaler")
+
     def test_validation_and_features(self) -> None:
         data = sample_data()
         validate_dataset(data)

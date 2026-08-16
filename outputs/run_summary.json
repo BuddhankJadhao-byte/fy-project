@@ -10,7 +10,8 @@
     "load_max_kw": 6306.206,
     "temperature_mean_c": 27.32453333333333,
     "humidity_mean_pct": 67.72568493150685,
-    "shutdown_hours": 66
+    "shutdown_hours": 66,
+    "iqr_outliers_replaced": 0
   },
   "training": {
     "features": [
@@ -40,22 +41,27 @@
     "test_end": "2021-12-31T23:00:00",
     "test_fraction": 0.2,
     "random_state": 42,
-    "tuned": false,
+    "tuned": true,
     "include_arima": true,
+    "preprocessing": {
+      "missing_values": "forward-fill (back-fill only for a leading gap)",
+      "outliers": "IQR detection followed by removal from signal and forward-fill replacement",
+      "continuous_feature_scaling": "MinMaxScaler fitted on training data only"
+    },
     "random_forest_params": {
       "bootstrap": true,
       "ccp_alpha": 0.0,
       "criterion": "squared_error",
-      "max_depth": 18,
+      "max_depth": 12,
       "max_features": 0.8,
       "max_leaf_nodes": null,
       "max_samples": null,
       "min_impurity_decrease": 0.0,
-      "min_samples_leaf": 1,
+      "min_samples_leaf": 6,
       "min_samples_split": 2,
       "min_weight_fraction_leaf": 0.0,
       "monotonic_cst": null,
-      "n_estimators": 160,
+      "n_estimators": 60,
       "n_jobs": -1,
       "oob_score": false,
       "random_state": 42,
@@ -67,21 +73,21 @@
   "metrics": [
     {
       "model": "Random Forest",
-      "mae_kw": 129.68920522032195,
-      "rmse_kw": 289.59727177726194,
-      "mape_pct": 7.587936376549361,
-      "r2": 0.9176757290728041
+      "mae_kw": 128.95517258892883,
+      "rmse_kw": 290.58897765202204,
+      "mape_pct": 7.562218294204377,
+      "r2": 0.917110936107798
     },
     {
       "model": "Linear Regression",
-      "mae_kw": 188.09641431344784,
-      "rmse_kw": 325.33857125899414,
-      "mape_pct": 11.660881407496598,
-      "r2": 0.8961013101642251
+      "mae_kw": 188.09641431345477,
+      "rmse_kw": 325.33857125899686,
+      "mape_pct": 11.66088140749661,
+      "r2": 0.8961013101642233
     },
     {
       "model": "24-hour Seasonal Naive",
-      "mae_kw": 206.25319662594532,
+      "mae_kw": 206.2531966259453,
       "rmse_kw": 370.0341494560826,
       "mape_pct": 12.07025028665241,
       "r2": 0.8655927880505567
@@ -89,9 +95,9 @@
     {
       "model": "ARIMA (2,1,0)",
       "mae_kw": 805.5240799693438,
-      "rmse_kw": 1023.1839839805087,
+      "rmse_kw": 1023.1839839805089,
       "mape_pct": 53.10638481032737,
-      "r2": -0.02765284247972999
+      "r2": -0.0276528424797299
     }
   ]
 }
