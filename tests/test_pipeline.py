@@ -69,6 +69,24 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(np.isfinite(forecast["forecast_load_kw"]).all())
         self.assertTrue((forecast["forecast_load_kw"] >= 0).all())
 
+    def test_forecast_can_start_on_an_arbitrary_future_date(self) -> None:
+        data = sample_data()
+        featured = build_features(data)
+        model = RandomForestRegressor(n_estimators=10, random_state=1).fit(featured[DEFAULT_FEATURES], featured["load_kw"])
+        forecast = forecast_future(data, model, 48, start_timestamp="2027-01-01")
+        self.assertEqual(forecast["timestamp"].iloc[0], pd.Timestamp("2027-01-01"))
+        self.assertEqual(forecast["timestamp"].iloc[-1], pd.Timestamp("2027-01-02 23:00:00"))
+
+    def test_forecast_accepts_a_full_leap_year_horizon(self) -> None:
+        data = sample_data()
+        featured = build_features(data)
+        model = RandomForestRegressor(n_estimators=1, max_depth=2, random_state=1).fit(
+            featured[DEFAULT_FEATURES], featured["load_kw"]
+        )
+        forecast = forecast_future(data, model, 24 * 366, start_timestamp="2024-01-01")
+        self.assertEqual(len(forecast), 24 * 366)
+        self.assertEqual(forecast["timestamp"].iloc[-1], pd.Timestamp("2024-12-31 23:00:00"))
+
     def test_pdf_report(self) -> None:
         metrics = pd.DataFrame([{"model": "Random Forest", "mae_kw": 10, "rmse_kw": 12, "mape_pct": 1, "r2": 0.98}])
         pdf = build_forecast_report(metrics, {"rows": 8760, "start": "2021-01-01"})
