@@ -1,0 +1,66 @@
+{
+  "pipeline_version": "1.0.0",
+  "dataset_name": "Godishala 33/11 kV Microgrid Substation",
+  "input_source": "data\\raw\\godishala_substation_2021.xlsx",
+  "initial_rows": 8760,
+  "initial_missing_values": 8694,
+  "missing_per_column": {
+    "timestamp": 0,
+    "load_kw": 0,
+    "temperature_c": 0,
+    "humidity_pct": 0,
+    "is_weekend": 0,
+    "season_code": 0,
+    "substation_shutdown": 8694
+  },
+  "physical_anomalies_corrected": {
+    "humidity_pct_unphysical": 6,
+    "load_kw_negative": 0
+  },
+  "iqr_multiplier": 1.5,
+  "outlier_statistics": {
+    "load_kw": {
+      "q1": 1062.656,
+      "q3": 3025.769,
+      "iqr": 1963.112,
+      "iqr_factor": 1.5,
+      "lower_bound": -1882.012,
+      "upper_bound": 5970.438,
+      "outlier_count": 7,
+      "outlier_percent": 0.08
+    },
+    "temperature_c": {
+      "q1": 24.444,
+      "q3": 30.0,
+      "iqr": 5.556,
+      "iqr_factor": 1.5,
+      "lower_bound": 16.111,
+      "upper_bound": 38.333,
+      "outlier_count": 242,
+      "outlier_percent": 2.763
+    },
+    "humidity_pct": {
+      "q1": 52.0,
+      "q3": 87.0,
+      "iqr": 35.0,
+      "iqr_factor": 1.5,
+      "lower_bound": -0.5,
+      "upper_bound": 139.5,
+      "outlier_count": 0,
+      "outlier_percent": 0.0
+    }
+  },
+  "total_rows_with_outliers": 249,
+  "imputed_dataset": {
+    "file": "cleaned_data_imputed.csv",
+    "rows": 8760,
+    "retained_timeline_hours": 8760,
+    "description": "Outliers replaced via forward-fill & interpolation; preserves continuous hourly index for time-series forecasting & lag features."
+  },
+  "dropped_dataset": {
+    "file": "cleaned_data_dropped.csv",
+    "rows": 8511,
+    "rows_removed": 249,
+    "description": "Rows with any outlier or unresolvable missing value removed; optimal for tabular regression benchmarks."
+  }
+}
